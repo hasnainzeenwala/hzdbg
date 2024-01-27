@@ -1,0 +1,11 @@
+#Ignore binaries
+*.exe
+*.o
+*.out
+
+#Ignore vscode
+.vscode/
+*.swp
+
+#Ignore build folder
+build/
