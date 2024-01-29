@@ -4,13 +4,14 @@
 #include <errno.h>
 #include <wait.h>
 #include <string.h>
+#include "shared.h"
 
 #define TRACEE_RUNNING 0
 #define TRACEE_STOPPED 1
 typedef int tracee_state;
 
 /*
- Launch debugger with "hzdbg /traceepath traceename"
+ Launch debugger with "hzdbg <traceepath> traceename"
 */
 
 tracee_state handle_user_action(pid_t pid)
@@ -40,22 +41,30 @@ void signal_receive_user_input_loop(pid_t pid, char *pname)
         {
             if (WIFSTOPPED(process_status) != 0)
             {
-                std::cout << pname << " is in a signal-delivery-stop state\n";
-                std::cout << pname << " received the " << strsignal(WSTOPSIG(process_status)) << " signal\n";
+                logger->info("tracee process pid: {}", pid);
+                logger->debug("{} is in a signal-delivery-stop state", pid);
+                logger->debug("{} received the {} signal", pid, strsignal(WSTOPSIG(process_status)));
 
                 // Display debugger prompt till the tracee process has been resumed
-                while (handle_user_action(pid) == TRACEE_STOPPED);
-
+                while (handle_user_action(pid) == TRACEE_STOPPED)
+                    ;
             }
             else if (WIFEXITED(process_status) != 0)
             {
-                std::cout << pname << " has exited with exit status: " << WEXITSTATUS(process_status) << "\n";
-                std::cout << "Tracee has exited, peace out!\n";
+                if (WEXITSTATUS(process_status) != 0)
+                {
+                    logger->info("Tracee process didn't exit happily, status: {}", WEXITSTATUS(process_status));
+                }
+                else
+                {
+                    logger->info("{} has exited", pid);
+                }
+                logger->info("HZDbg is done, peace out!");
                 return;
             }
             else
             {
-                std::cout << "Process hasn't stopped nor exited: [process status: " << process_status << "]\n";
+                logger->error("tracee {} process hasn't stopped nor exited: [process status: {}]", pid, process_status);
             }
         }
     }
@@ -73,28 +82,31 @@ int main(int argc, char *argv[])
         int fork_result = fork();
         if (fork_result == 0)
         {
+            init_logger("/tmp/traceeproc.log");
             // Child process
             // Child process asks parent to trace it.
             if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) == -1)
             {
-                std::cout << "Ptrace traceme was unsuccessful. Error code: " << errno << "\n";
+                logger->error("Ptrace traceme was unsuccessful: {}", strerror(errno));
                 return 1;
             }
             // Use exec system call to load the actual program that has to be traced.
             // Since the process is being traced, after success of exec the process will be
             // sent a SIGTRAP which will cause it to enter signal-delivery-stop.
             int r = execl(argv[1], argv[2], (char *)NULL);
-            std::cout << "Exec result: " << r << std::endl;
+            logger->error("Exec failed for {} {}", argv[2], strerror(errno));
+            return 1;
         }
         else
         {
-            std::cout << "tracee process pid: " << fork_result << "\n";
+            init_logger("/tmp/hzdbg.log");
             signal_receive_user_input_loop(fork_result, argv[2]);
         }
     }
     else
     {
-        std::cout << "No tracee file provided, exiting!\n";
+        printf("Don't have anything to trace. Please provide a tracee: ./hzdbg <traceepath> <traceename>\n");
+        logger->info("No tracee file provided, exiting!");
     }
 
     return 0;
