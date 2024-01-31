@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/personality.h>
 #include "shared.h"
+#include <sstream>
 
 #define TRACEE_RUNNING 0
 #define TRACEE_STOPPED 1
@@ -14,6 +15,22 @@ typedef int tracee_state;
 /*
  Launch debugger with "hzdbg <traceepath> traceename"
 */
+std::vector<std::string> take_input()
+{
+    std::string line;
+    printf(">>> ");
+    fflush(stdout);
+    std::getline(std::cin, line);
+
+    std::vector<std::string> result;
+    std::istringstream iss(line);
+    std::string word;
+    while (iss >> word)
+    {
+        result.push_back(word);
+    }
+    return result;
+}
 
 tracee_state handle_user_action(pid_t pid)
 {
