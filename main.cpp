@@ -106,6 +106,8 @@ int main(int argc, char *argv[])
             // Use exec system call to load the actual program that has to be traced.
             // Since the process is being traced, after success of exec the process will be
             // sent a SIGTRAP which will cause it to enter signal-delivery-stop.
+            fflush(NULL); // call fflush to flush all output buffers of the current process before calling exec
+            // BUG: Resource leak could be happening because I'm not closing the FDs of the parent process
             int r = execl(argv[1], argv[2], (char *)NULL);
             logger->error("Exec failed for {} {}", argv[2], strerror(errno));
             return 1;
