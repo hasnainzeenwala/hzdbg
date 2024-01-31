@@ -13,6 +13,7 @@ void init_logger(const char *logfile)
         std::cout << "Log init failed: " << ex.what() << std::endl;
     }
     const char *log_level = std::getenv("HZDBG_LOG_LEVEL");
+    logger->flush_on(spdlog::level::debug);
     if (log_level == NULL)
     {
         logger->set_level(spdlog::level::info);
