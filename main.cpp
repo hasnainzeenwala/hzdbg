@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <wait.h>
 #include <string.h>
+#include <sys/personality.h>
 #include "shared.h"
 
 #define TRACEE_RUNNING 0
@@ -59,7 +60,7 @@ void signal_receive_user_input_loop(pid_t pid, char *pname)
                 {
                     logger->info("{} has exited", pid);
                 }
-                logger->info("HZDbg is done, peace out!");
+                printf("HZDbg is done, peace out!\n");
                 return;
             }
             else
@@ -82,8 +83,20 @@ int main(int argc, char *argv[])
         int fork_result = fork();
         if (fork_result == 0)
         {
-            init_logger("/tmp/traceeproc.log");
             // Child process
+            init_logger("/tmp/traceeproc.log");
+
+            // Set personality of this process to disable ASLR (Address space layout randomisation)
+            // This will help in setting breakpoints. Otherwise we could have different offsets for
+            // different region in the process address space, making it difficult to set breakpoints
+            // from addresses obtained from objdump. The system call will take effect when we call
+            // "exec" later
+            if (personality(ADDR_NO_RANDOMIZE) == -1)
+            {
+                logger->error("Personality syscall failed: ", strerror(errno));
+                return 1;
+            }
+
             // Child process asks parent to trace it.
             if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) == -1)
             {
